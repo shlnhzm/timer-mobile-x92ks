@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Game Timer - Mobile Full</title>
+    <style>
+        :root { --circle-color: #ffff00; --grand-color: #ff4444; }
+        body { font-family: sans-serif; background: #1a1a1a; color: #eee; margin: 0; padding: 10px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
+        
+        /* ヘッダーエリア */
+        .header { flex-shrink: 0; border-bottom: 2px solid #444; padding-bottom: 8px; }
+        .timer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .main-timer { font-size: 56px; color: #0f0; font-family: monospace; font-weight: bold; flex-shrink: 0; }
+        .liger-box { font-size: 28px; color: #00d4ff; font-family: monospace; border: 1px solid #444; padding: 5px 10px; border-radius: 8px; background: #222; flex-grow: 1; text-align: center; }
+        
+        .clock-adj { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+        .btn-adj { width: 40px; height: 35px; background: #333; color: #fff; border: 1px solid #666; font-size: 18px; border-radius: 5px; }
+
+        .control-row { display: flex; gap: 8px; margin-top: 8px; height: 55px; }
+        .start-btn { flex: 2; background: #ff4444; color: #fff; border: none; border-radius: 10px; font-size: 22px; font-weight: bold; box-shadow: 0 4px #922; }
+        .start-btn.running { background: #00ff00; color: #000; box-shadow: 0 4px #060; }
+        .sync-input { width: 85px; background: #222; color: #fff; border: 2px solid #666; border-radius: 10px; font-size: 22px; text-align: center; flex-shrink: 0; }
+
+        /* 始動ボタン */
+        .trigger-row { display: flex; gap: 8px; margin-top: 8px; }
+        .btn-trigger { flex: 1; height: 48px; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; }
+        .btn-trigger.circle { background: var(--circle-color); color: #000; }
+        .btn-trigger.grand { background: var(--grand-color); color: #fff; }
+
+        /* コンテンツ（表） */
+        .content-area { flex-grow: 1; position: relative; margin-top: 10px; overflow: hidden; display: flex; flex-direction: column; }
+        .view-container { display: none; height: 100%; flex-direction: column; background: #fff; border-radius: 10px 10px 0 0; }
+        .view-container.active { display: flex; }
+        
+        .table-nav { display: flex; justify-content: space-between; align-items: center; background: #2a2a2a; padding: 8px 15px; border-radius: 10px 10px 0 0; }
+        .btn-table-adj { width: 55px; height: 40px; font-size: 24px; font-weight: bold; border-radius: 5px; border: none; }
+
+        .table-scroll { flex-grow: 1; overflow-y: auto; color: #000; }
+        table { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: fixed; }
+        th { background: #eee; position: sticky; top: 0; padding: 8px 4px; font-size: 14px; border: 1px solid #ccc; }
+        td { border: 1px solid #ccc; padding: 12px 4px; text-align: center; word-break: break-all; }
+        
+        /* 列幅調整 */
+        .col-idx { width: 30px; }
+        .col-time { width: 65px; }
+        .col-type { width: auto; }
+        .col-judge { width: 50px; }
+
+        .current-row { background: #ff9999 !important; font-weight: bold; outline: 3px solid red; z-index: 1; }
+        .next-row { background: #ffff99 !important; }
+        .placeholder { flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: #888; border: 2px dashed #444; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="timer-row">
+        <div id="masterClock" class="main-timer">9:59</div>
+        <div id="ligerDisplay" class="liger-box">--:--</div>
+        <div class="clock-adj">
+            <button class="btn-adj" onclick="adjustClock(1)">＋</button>
+            <button class="btn-adj" onclick="adjustClock(-1)">－</button>
+        </div>
+    </div>
+    
+    <div class="control-row">
+        <button id="startBtn" class="start-btn" onclick="toggleTimer()">START</button>
+        <input type="text" id="syncInput" class="sync-input" placeholder="840" inputmode="numeric">
+    </div>
+
+    <div class="trigger-row">
+        <button class="btn-trigger circle" onclick="triggerCalamity('A')">サークル始動</button>
+        <button class="btn-trigger grand" onclick="triggerCalamity('G')">グランド始動</button>
+    </div>
+</div>
+
+<div class="content-area">
+    <div id="placeholder" class="placeholder">始動ボタンで表を表示</div>
+
+    <div id="viewA" class="view-container">
+        <div class="table-nav">
+            <span style="color:var(--circle-color); font-weight:bold;">サークル補正</span>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-table-adj" style="background:var(--circle-color);" onclick="adjustTableOnly('A', 1)">＋</button>
+                <button class="btn-table-adj" style="background:var(--circle-color);" onclick="adjustTableOnly('A', -1)">－</button>
+            </div>
+        </div>
+        <div class="table-scroll" id="containerA">
+            <table id="tableA">
+                <thead><tr><th class="col-idx">#</th><th class="col-time">予定</th><th class="col-type">場所</th><th class="col-judge">判定</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="viewG" class="view-container">
+        <div class="table-nav">
+            <span style="color:var(--grand-color); font-weight:bold;">グランド補正</span>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-table-adj" style="background:var(--grand-color); color:#fff;" onclick="adjustTableOnly('G', 1)">＋</button>
+                <button class="btn-table-adj" style="background:var(--grand-color); color:#fff;" onclick="adjustTableOnly('G', -1)">－</button>
+            </div>
+        </div>
+        <div class="table-scroll" id="containerG">
+            <table id="tableG">
+                <thead><tr><th class="col-idx">#</th><th class="col-time">予定</th><th class="col-type">ギミック詳細</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+const configA = [[1,"線上",0,""],[2,"線上",24,"おそ"],[3,"金網",21,""],[4,"線上",23,"おそ"],[5,"外周",21,""],[6,"金網",25,"おそ"],[1,"線上",20,""],[2,"線上",24,"おそ"],[3,"金網",21,""],[4,"線上",24,"おそ"],[5,"外周",20,""],[6,"金網",24,"おそ"],[1,"線上",21,""],[2,"線上",24,"おそ"],[3,"金網",20,""],[4,"線上",24,"おそ"],[5,"外周",21,""],[6,"金網",24,"おそ"]];
+const configG = [[1,"虹",0],[2,"黄（初回：金網線上、安置外周）",22],[3,"虹",24],[4,"黄（初回：真ん中線外、安置外周）",23],[5,"虹",24],[6,"黄（初回：金網線上、安置なし）",23],[7,"虹",23],[8,"黄（線上安置）",24],[9,"虹",24],[10,"黄（金網上安置）",22],[11,"虹",24],[12,"黄（線上外側安置）",23],[13,"虹",22],[14,"黄（初回：金網線上、安置外周）",24],[15,"虹",24],[16,"黄（初回：真ん中線外、安置外周）",22],[17,"虹",24]];
+
+let startTimeMS = null, timerId = null, inputSecs = { A: null, G: null }, lastPlayedSec = -1;
+const DEFAULT_START_SEC = 599;
+
+// オーディオ設定
+let audioCtx = null;
+function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+function playTone(freq, duration) { 
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
+}
+
+function toggleTimer() { initAudio(); if (startTimeMS === null) startTimer(); else resetTimer(); }
+
+function startTimer(offsetSec = DEFAULT_START_SEC) {
+    startTimeMS = Date.now() - (DEFAULT_START_SEC - offsetSec) * 1000;
+    document.getElementById('startBtn').textContent = "RUNNING";
+    document.getElementById('startBtn').classList.add('running');
+    if (timerId) clearInterval(timerId);
+    timerId = setInterval(updateAll, 100);
+}
+
+function resetTimer() {
+    startTimeMS = null; clearInterval(timerId); timerId = null;
+    document.getElementById('startBtn').textContent = "START";
+    document.getElementById('startBtn').classList.remove('running');
+    document.getElementById('masterClock').textContent = "9:59";
+    document.getElementById('ligerDisplay').textContent = "--:--";
+    inputSecs = { A: null, G: null };
+    document.getElementById('placeholder').style.display = 'flex';
+    document.getElementById('viewA').classList.remove('active');
+    document.getElementById('viewG').classList.remove('active');
+    lastPlayedSec = -1;
+}
+
+function triggerCalamity(type) {
+    initAudio();
+    const syncVal = document.getElementById('syncInput').value.trim();
+    if (syncVal !== "" && inputSecs[type] === null) {
+        let totalSec = parseInt(syncVal.replace(/:/g, ""));
+        if (syncVal.length >= 3) totalSec = Math.floor(totalSec/100)*60 + (totalSec%100);
+        startTimer(totalSec);
+        document.getElementById('syncInput').value = "";
+    }
+    if (startTimeMS === null) return;
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('viewA').classList.toggle('active', type === 'A');
+    document.getElementById('viewG').classList.toggle('active', type === 'G');
+    if (inputSecs[type] === null) {
+        const elapsed = (Date.now() - startTimeMS) / 1000;
+        inputSecs[type] = Math.floor(DEFAULT_START_SEC - elapsed) - (type === 'A' ? 5 : 6);
+        renderTable(type);
+    }
+}
+
+function updateAll() {
+    const elapsed = (Date.now() - startTimeMS) / 1000, currentClock = DEFAULT_START_SEC - elapsed;
+    if (currentClock <= 0) { resetTimer(); return; }
+    const curSec = Math.floor(currentClock);
+    document.getElementById('masterClock').textContent = formatTime(curSec);
+    document.getElementById('ligerDisplay').textContent = "L " + formatTime(Math.floor(currentClock - 65));
+    checkAudio(curSec, (inputSecs.G !== null));
+    if (inputSecs.A !== null) updateHighlights('A', currentClock);
+    if (inputSecs.G !== null) updateHighlights('G', currentClock);
+}
+
+function checkAudio(cur, isRainbow) {
+    if (cur === lastPlayedSec) return;
+    let targets = [];
+    if (inputSecs.G !== null) targets = getScheduledTimes('G');
+    else if (inputSecs.A !== null && !isRainbow) targets = getScheduledTimes('A');
+    targets.forEach(t => {
+        const diff = cur - t;
+        if (diff >= 1 && diff <= 3) { playTone(440, 0.15); lastPlayedSec = cur; }
+        else if (diff === 0) { playTone(880, 0.6); lastPlayedSec = cur; }
+    });
+}
+
+function adjustClock(s) { if(startTimeMS) { startTimeMS += s*1000; updateAll(); } }
+function adjustTableOnly(type, s) { if(inputSecs[type]) { inputSecs[type] += s; renderTable(type); } }
+function formatTime(s) {
+    const abs = Math.abs(s), m = Math.floor(abs / 60), sec = abs % 60;
+    return (s < 0 ? "-" : "") + m + ":" + sec.toString().padStart(2, '0');
+}
+function getScheduledTimes(type) { return Array.from(document.querySelectorAll(`#table${type} tbody tr`)).map(r => parseInt(r.dataset.time)); }
+
+function renderTable(type) {
+    const tbody = document.querySelector(`#table${type} tbody`);
+    tbody.innerHTML = ""; let cum = 0;
+    const config = (type === 'A' ? configA : configG);
+    config.forEach(row => {
+        cum += row[2];
+        const rowSec = inputSecs[type] - cum, tr = document.createElement("tr");
+        tr.dataset.time = rowSec;
+        let html = `<td>${row[0]}</td><td>${formatTime(rowSec)}</td><td>${row[1]}</td>`;
+        if (type === 'A') html += `<td>${row[3] || ""}</td>`;
+        tr.innerHTML = html;
+        tbody.appendChild(tr);
+    });
+}
+
+function updateHighlights(type, now) {
+    const rows = document.querySelectorAll(`#table${type} tbody tr`);
+    let next = null;
+    rows.forEach(r => {
+        const t = parseInt(r.dataset.time);
+        r.className = "";
+        if (!next && t < now - 2) next = r;
+        if (Math.abs(now - t) <= 2) r.className = "current-row";
+    });
+    if (next && next.className !== "current-row") next.className = "next-row";
+    const target = document.querySelector(`#table${type} .current-row`) || next;
+    if (target && document.getElementById(`view${type}`).classList.contains('active')) {
+        const container = document.getElementById(`container${type}`);
+        container.scrollTop = target.offsetTop - 100;
+    }
+}
+</script>
+</body>
+</html>
